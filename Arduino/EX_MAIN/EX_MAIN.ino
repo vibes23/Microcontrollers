@@ -147,6 +147,7 @@ void AutoCalibrate(){
   Serial.print(",");
   Serial.println(led_blue);
   Serial.println("\n");
+  Serial.println("");
 }
 
 void setup() {
