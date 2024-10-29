@@ -7,10 +7,13 @@
 #define EM 6
 #define LDR A2
 #define PROX 12
+#define AVG_LEN 3
 
 Servo M1,M2;
 
 int tol = 8;
+bool out[AVG_LEN] = {false, false, false};
+// , false, false}; 
 
 uint8_t whitepart1 = 0;
 uint8_t whitepart2 = 155;
@@ -167,6 +170,7 @@ void setup() {
   M1.attach(5);
   M2.attach(6);
   M1.write(0);
+  M2.write(60);
   lcd.begin(16, 2);
 
   pinMode(RED,OUTPUT);
@@ -216,16 +220,19 @@ bool location(int color = 0){
     
   if(color == 1){ // check whether the color is red
     if(isColor(red_cur, green_cur, blue_cur) == 1){
+      // Serial.println("Red");
       return true;
     }
     return false;
   }else if(color == 2){ //check whether the color is green
     if(isColor(red_cur, green_cur, blue_cur) == 2){
+      // Serial.println("Green");
       return true;
     }
     return false;
   }else if(color == 3){ //check whether the color is blue
     if(isColor(red_cur, green_cur, blue_cur) == 3){
+      // Serial.println("Blue");
       return true;
     }
     return false;
@@ -266,6 +273,7 @@ int isColor(int red_cur, int green_cur, int blue_cur) {
 }
 int input = -1;
 bool picked = false;
+bool flag =  true; 
 void loop(){
   if (Serial.available() > 0) {
     int inputChar = Serial.read();
@@ -320,38 +328,108 @@ void loop(){
       if(pick==1 || pick==2 || pick==3){
         break;
       }else{
-        Serial.println("Please select valid option");
+        if(flag){
+          Serial.println("Please select valid option");
+          flag = false;
+        }
       }
     }
 
     Serial.println("Press 1 to drop at red");
     Serial.println("Press 2 to drop at green");
     Serial.println("Press 3 to drop at blue");
-
+    flag = true;
     while(true){
+      char c;
       if(Serial.available()){
-        char c = Serial.read();
+        c = Serial.read();
         if(c!='\n'){
           drop = c -'0';
         }
       }
       if(drop==1 || drop==2 || drop==3){
         break;
-      }else{
-        Serial.println("Please select valid option");
+      }else if(c!='\n'){
+        if(flag){
+          Serial.println("Please select valid option");
+          flag = false;
+        }
       }
     }
-    if(location(pick) && (digitalRead(PROX)==HIGH)){
-      M2.write(180);
-      EMctrl(1);
-      M2.write(0);
-      picked = true;
+    int pos = 0;
+    int dir = 1;
+    while (true){     //code to pickup
+
+      bool trust = true;
+      M1.write(pos);
+
+      for (int i = AVG_LEN-2;i>=0;i--){
+        out[i+1] = out[i]; 
+      }
+      out[0] = location(pick);
+
+      for (int i = 0;i<AVG_LEN;i++){
+        if(out[i] == false){
+        trust = false;
+        }
+      } 
+
+      if(trust){ 
+      // && (digitalRead(PROX)==HIGH)){
+        M2.write(120);
+        EMctrl(1);
+        delay(1000);
+        M2.write(60);
+        picked = true;
+        Serial.println("Picked the target");
+        break;
+      }
+
+      pos = pos + dir; 
+      if(pos>=180 || pos<=0){
+        dir *= -1;
+      }
     }
-    if(location(drop) && picked){
-      M2.write(180);
-      EMctrl(0);
-      M2.write(0);
-      picked = false;
+
+    while (true){
+
+      bool trust = true;
+      M1.write(pos);
+
+      for (int i = AVG_LEN-2;i>=0;i--){
+        out[i+1] = out[i]; 
+      }
+      out[0] = location(pick);
+
+      for (int i = 0;i<AVG_LEN;i++){
+        if(out[i] == false){
+        trust = false;
+        }
+      } 
+
+      if(location(drop) && picked){ 
+      // && (digitalRead(PROX)==HIGH)){
+        M2.write(120);
+        EMctrl(0);
+        delay(1000);
+        M2.write(60);
+        // picked = false;
+        Serial.println("Dropped the target");
+        break;
+      }
+
+      pos = pos + dir; 
+      if(pos>=180 || pos<=0){
+        dir *= -1;
+      }
     }
+
+      // if(location(drop) && picked){
+      //   M2.write(180);
+      //   EMctrl(0);
+      //   M2.write(0);
+      //   picked = false;
+      // }
+    M1.write(0);
   }
 }  
