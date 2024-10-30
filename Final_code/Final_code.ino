@@ -12,8 +12,14 @@
 Servo M1,M2;
 
 int tol = 8;
-bool out[AVG_LEN] = {false, false, false};
-// , false, false}; 
+bool out[AVG_LEN];
+
+// Initializes the out array to all false values.
+void init_out(){
+  for(int i = 0; i < AVG_LEN; i++){
+    out[i] = false;
+  }
+}
 
 uint8_t whitepart1 = 0;
 uint8_t whitepart2 = 155;
@@ -176,9 +182,9 @@ void setup() {
   pinMode(RED,OUTPUT);
   pinMode(BLUE,OUTPUT);
   pinMode(GREEN,OUTPUT);
-
   pinMode(LDR,INPUT_PULLUP);
 
+  init_out();
   Serial.begin(9600);
 
   Serial.println("Setup Done");  
@@ -271,21 +277,36 @@ int isColor(int red_cur, int green_cur, int blue_cur) {
     return 0;
   }
 }
+
+/**
+ * @brief Reads input from the serial monitor and returns the input as an integer.
+ * 
+ * @return The integer value of the input received from the serial monitor.
+ * -1: Invalid input
+ */
+int readSerialInput() {
+  char receivedChar = Serial.read();
+  if (receivedChar >= '0' && receivedChar <= '9') {
+    return receivedChar - '0';
+  }else{
+    Serial.println("Invalid input.");
+    return -1;
+  }
+}
+
 int input = -1;
 bool picked = false;
-bool flag =  true; 
+bool is_valid =  true; // to limit printing of invalid input
+
 void loop(){
-  if (Serial.available() > 0) {
-    int inputChar = Serial.read();
-    if (inputChar >= '0' && inputChar <= '9') {
-      input = inputChar - '0';
-    }
+  if (Serial.available()) {
+    input = readSerialInput();
   }
   if(input<0){
-    Serial.println("Press 1 for manual calibration");
-    Serial.println("Press 2 for auto calibration");
-    Serial.println("Press 3 to  check colour regions");
-    Serial.println("Press 4 to pick up and drop\n");
+    Serial.println("Press 1 for manual calibration.");
+    Serial.println("Press 2 for auto calibration.");
+    Serial.println("Press 3 to  check colour regions.");
+    Serial.println("Press 4 to pick up and drop.\n");
     input = 0;
   }
   if(input>0){
@@ -310,104 +331,109 @@ void loop(){
     }
     input = 0;
   }
+
   if(input==4){
     int pick = -1;
     int drop = -1;
 
-    Serial.println("Press 1 to pick up at red");
-    Serial.println("Press 2 to pick up at green");
-    Serial.println("Press 3 to pick up at blue");
-
+    Serial.println("Press 1 to pick up at red.");
+    Serial.println("Press 2 to pick up at green.");
+    Serial.println("Press 3 to pick up at blue.\n");
+    
+    is_valid = false;
     while(true){
       if(Serial.available()){
-        char c = Serial.read();
-        if(c!='\n'){
-          pick = c -'0';
-        }
+        pick = readSerialInput();
+        is_valid = true;  //getting update when input is read
       }
       if(pick==1 || pick==2 || pick==3){
         break;
       }else{
-        if(flag){
-          Serial.println("Please select valid option");
-          flag = false;
+        if(is_valid){ //to prevent constant printing of the same message
+          Serial.println("Please select valid option.");  
+          is_valid = false; //resetting flag to prevent printing again until input is received
         }
       }
     }
 
-    Serial.println("Press 1 to drop at red");
-    Serial.println("Press 2 to drop at green");
-    Serial.println("Press 3 to drop at blue");
-    flag = true;
+    Serial.println("Press 1 to drop at red.");
+    Serial.println("Press 2 to drop at green.");
+    Serial.println("Press 3 to drop at blue.");
+    
+    is_valid = false;
     while(true){
-      char c;
       if(Serial.available()){
-        c = Serial.read();
-        if(c!='\n'){
-          drop = c -'0';
-        }
+        drop = readSerialInput();
+        is_valid = true;  //getting update when input is read
       }
       if(drop==1 || drop==2 || drop==3){
         break;
       }else if(c!='\n'){
-        if(flag){
+        if(is_valid){ //to prevent constant printing of the same message
           Serial.println("Please select valid option");
-          flag = false;
+          is_valid = false; //resetting flag to prevent printing again until input is received
         }
       }
     }
-    int pos = 0;
-    int dir = 1;
-    while (true){     //code to pickup
 
-      bool trust = true;
+    int pos = 0;  //init position
+    int dir = 1;  //init direction
+
+    while (true){     //code to pickup
+      bool validate = true;
       M1.write(pos);
 
-      for (int i = AVG_LEN-2;i>=0;i--){
-        out[i+1] = out[i]; 
+      // Shift elements in the array to the right
+      for (int index = AVG_LEN - 2; index >= 0; index--) {
+        out[index + 1] = out[index];
       }
-      out[0] = location(pick);
+      out[0] = location(pick); // Update the first element with the current location check
 
-      for (int i = 0;i<AVG_LEN;i++){
-        if(out[i] == false){
-        trust = false;
+      // Validate the last AVG_LEN readings
+      // If any of them is false, break the loop
+      for (int i = 0; i < AVG_LEN; i++) {
+        if (!out[i]) {
+          validate = false; // If any of the readings is false, set validate to false
+          break;
         }
-      } 
+      }
 
-      if(trust){ 
-      // && (digitalRead(PROX)==HIGH)){
+      if(validate){ 
+        //activate motor and EM  
         M2.write(120);
         EMctrl(1);
         delay(1000);
+        //retract motor
         M2.write(60);
+        delay(1000); 
         picked = true;
         Serial.println("Picked the target");
         break;
       }
 
-      pos = pos + dir; 
-      if(pos>=180 || pos<=0){
+      pos = pos + dir; // Update the position
+      if(pos>=180 || pos<=0){ //changing direction of motor if it goes out of range
         dir *= -1;
       }
     }
 
     while (true){
-
-      bool trust = true;
+      bool validate = true;
       M1.write(pos);
 
-      for (int i = AVG_LEN-2;i>=0;i--){
-        out[i+1] = out[i]; 
+      // Shift elements in the array to the right
+      for (int index = AVG_LEN - 2; index >= 0; index--) {
+        out[index + 1] = out[index];
       }
-      out[0] = location(pick);
-
+      out[0] = location(drop); // Update the first element with the current location check
       for (int i = 0;i<AVG_LEN;i++){
+
         if(out[i] == false){
-        trust = false;
+        validate = false;
         }
       } 
 
-      if(location(drop) && picked){ 
+      if(validate && picked){ 
       // && (digitalRead(PROX)==HIGH)){
         M2.write(120);
         EMctrl(0);
@@ -423,13 +449,6 @@ void loop(){
         dir *= -1;
       }
     }
-
-      // if(location(drop) && picked){
-      //   M2.write(180);
-      //   EMctrl(0);
-      //   M2.write(0);
-      //   picked = false;
-      // }
     M1.write(0);
   }
 }  
