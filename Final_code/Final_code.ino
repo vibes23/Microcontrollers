@@ -368,7 +368,7 @@ void loop(){
       }
       if(drop==1 || drop==2 || drop==3){
         break;
-      }else if(c!='\n'){
+      }else{
         if(is_valid){ //to prevent constant printing of the same message
           Serial.println("Please select valid option");
           is_valid = false; //resetting flag to prevent printing again until input is received
@@ -380,7 +380,7 @@ void loop(){
     int dir = 1;  //init direction
 
     while (true){     //code to pickup
-      bool validate = true;
+      bool validate = true; // Flag to check if all AVG_LEN readings are true
       M1.write(pos);
 
       // Shift elements in the array to the right
