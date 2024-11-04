@@ -1,12 +1,14 @@
 #include <Servo.h>
 #include <LiquidCrystal.h>
 
-#define RED 9
+#define RED 9 // Pins for the RGB LEDs
 #define GREEN 11
 #define BLUE 10
-#define EM 6
-#define LDR A2
-#define PROX 12
+
+#define EM 6  // Pin for the electromagnet
+#define LDR A2  // Pin for the LDR
+#define PROX 12 // Pin for the proximity sensor
+
 #define AVG_LEN 3
 
 Servo M1,M2;
@@ -399,16 +401,21 @@ void loop(){
       }
 
       if(validate){ 
-        //activate motor and EM  
-        M2.write(120);
-        EMctrl(1);
-        delay(1000);
-        //retract motor
-        M2.write(60);
-        delay(1000); 
-        picked = true;
-        Serial.println("Picked the target");
-        break;
+        if(digitalRead(PROX)){
+          //activate motor and EM  
+          M2.write(120);
+          EMctrl(1);
+          delay(1000);
+          //retract motor
+          M2.write(60);
+          delay(1000); 
+          picked = true;
+          Serial.println("Picked the target");
+          break;
+        }
+        else{
+          Serial.println("Proximity sensor not detected");
+        }
       }
 
       pos = pos + dir; // Update the position
@@ -416,6 +423,8 @@ void loop(){
         dir *= -1;
       }
     }
+
+    init_out(); // Reset the out array
 
     while (true){
       bool validate = true;
@@ -434,7 +443,6 @@ void loop(){
       } 
 
       if(validate && picked){ 
-      // && (digitalRead(PROX)==HIGH)){
         M2.write(120);
         EMctrl(0);
         delay(1000);
