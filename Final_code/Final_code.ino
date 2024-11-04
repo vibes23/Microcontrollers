@@ -51,7 +51,7 @@ int blue_int = 255;
  * in the format "R:<red_intensity>G:<green_intensity>B:<blue_intensity>".
  */
 void ManualCalibrate(){
-  M1.write(0);
+  ServoCtrl(M1,0);
 
   digitalWrite(RED,HIGH);
   delay(delay_time);
@@ -102,7 +102,7 @@ void AutoCalibrate(){
   green_int = 255;
   blue_int = 255;
   
-  M1.write(0);  
+  ServoCtrl(M1,0);  
 
   analogWrite(RED,red_int);
   delay(delay_time);
@@ -175,10 +175,9 @@ void AutoCalibrate(){
 }
 
 void setup() {
-  M1.attach(5);
-  M2.attach(6);
-  M1.write(0);
-  M2.write(60);
+  ServoCtrl(M1,0);
+  ServoCtrl(M2,0);
+
   lcd.begin(16, 2);
 
   pinMode(RED,OUTPUT);
@@ -296,6 +295,20 @@ int readSerialInput() {
   }
 }
 
+/**
+ * @brief Attaches the servo motors to the arduino, sets the position of the servo given by the parameter pos, and then detaches the servo.
+ * 
+ * @param M The servo object to control.
+ * @param pos The position to set the servo to.
+ */
+void ServoCtrl(Servo M,int pos){
+  M1.attach(5);
+  M2.attach(6);
+  M.write(pos);
+  M1.detach();
+  M2.detach();
+}
+
 int input = -1;
 bool picked = false;
 bool is_valid =  true; // to limit printing of invalid input
@@ -319,16 +332,20 @@ void loop(){
   }
   if(input==2){
     AutoCalibrate();
+    lcd.clear();
+    lcd.setCursor(0,0);
+    lcd.print("Auto Calibration Done");
+    input = -1;
     input = 0;
   }
   
   if(input==3){
     for (int pos = 0; pos <= 180; pos += 1){
-      M1.write(pos);
+      ServoCtrl(M1,pos);
       location();
     }
     for (int pos = 180; pos >= 0; pos -= 1){
-      M1.write(pos);
+      ServoCtrl(M1,pos);
       location();
     }
     input = 0;
@@ -341,6 +358,14 @@ void loop(){
     Serial.println("Press 1 to pick up at red.");
     Serial.println("Press 2 to pick up at green.");
     Serial.println("Press 3 to pick up at blue.\n");
+
+    lcd.clear();
+    lcd.setCursor(0,0);
+    lcd.print("Pick up at Red: 1");
+    lcd.setCursor(0,1);
+    lcd.print("Pick up at Green: 2");
+    lcd.setCursor(0,2);
+    lcd.print("Pick up at Blue: 3");
     
     is_valid = false;
     while(true){
@@ -362,6 +387,14 @@ void loop(){
     Serial.println("Press 2 to drop at green.");
     Serial.println("Press 3 to drop at blue.");
     
+    lcd.clear();
+    lcd.setCursor(0,0);
+    lcd.print("Drop at Red: 1");
+    lcd.setCursor(0,1);
+    lcd.print("Drop at Green: 2");
+    lcd.setCursor(0,2);
+    lcd.print("Drop at Blue: 3");
+
     is_valid = false;
     while(true){
       if(Serial.available()){
@@ -383,7 +416,7 @@ void loop(){
 
     while (true){     //code to pickup
       bool validate = true; // Flag to check if all AVG_LEN readings are true
-      M1.write(pos);
+      ServoCtrl(M1, pos);
 
       // Shift elements in the array to the right
       for (int index = AVG_LEN - 2; index >= 0; index--) {
@@ -403,11 +436,17 @@ void loop(){
       if(validate){ 
         if(digitalRead(PROX)){
           //activate motor and EM  
-          M2.write(120);
+          lcd.clear();
+          lcd.print("Proximity sensor detected");
+          ServoCtrl(M2, 120);
+
           EMctrl(1);
           delay(1000);
+          lcd.clear();
+          lcd.print("Picking up the target");
+          
           //retract motor
-          M2.write(60);
+          ServoCtrl(M2, 60);
           delay(1000); 
           picked = true;
           Serial.println("Picked the target");
@@ -417,6 +456,9 @@ void loop(){
           Serial.println("Proximity sensor not detected");
         }
       }
+
+      lcd.clear();
+      lcd.print("Picking mode");
 
       pos = pos + dir; // Update the position
       if(pos>=180 || pos<=0){ //changing direction of motor if it goes out of range
@@ -428,7 +470,7 @@ void loop(){
 
     while (true){
       bool validate = true;
-      M1.write(pos);
+      ServoCtrl(M1, pos);
 
       // Shift elements in the array to the right
       for (int index = AVG_LEN - 2; index >= 0; index--) {
@@ -443,20 +485,26 @@ void loop(){
       } 
 
       if(validate && picked){ 
-        M2.write(120);
+        ServoCtrl(M2, 120);
         EMctrl(0);
         delay(1000);
-        M2.write(60);
+        ServoCtrl(M2, 60);
         // picked = false;
         Serial.println("Dropped the target");
         break;
       }
+
+      lcd.clear();
+      lcd.print("Dropping mode");
 
       pos = pos + dir; 
       if(pos>=180 || pos<=0){
         dir *= -1;
       }
     }
-    M1.write(0);
+    ServoCtrl(M1,0);
+
+    lcd.clear();
+    lcd.print("Program complete");
   }
 }  
