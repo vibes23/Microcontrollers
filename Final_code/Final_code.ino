@@ -2,18 +2,18 @@
 #include <LiquidCrystal.h>
 
 #define RED 9 // Pins for the RGB LEDs
-#define GREEN 11
-#define BLUE 10
+#define GREEN 10
+#define BLUE 11
 
-#define EM 6  // Pin for the electromagnet
+#define EM 7  // Pin for the electromagnet
 #define LDR A2  // Pin for the LDR
 #define PROX 12 // Pin for the proximity sensor
 
-#define AVG_LEN 3
+#define AVG_LEN 5
 
 Servo M1,M2;
 
-int tol = 8;
+int tol = 12;
 bool out[AVG_LEN];
 
 // Initializes the out array to all false values.
@@ -176,7 +176,7 @@ void AutoCalibrate(){
 
 void setup() {
   ServoCtrl(M1,0);
-  ServoCtrl(M2,0);
+  ServoCtrl(M2,20);
 
   lcd.begin(16, 2);
 
@@ -184,6 +184,9 @@ void setup() {
   pinMode(BLUE,OUTPUT);
   pinMode(GREEN,OUTPUT);
   pinMode(LDR,INPUT_PULLUP);
+  pinMode(EM,OUTPUT);
+
+  digitalWrite(EM,LOW);
 
   init_out();
   Serial.begin(9600);
@@ -305,6 +308,7 @@ void ServoCtrl(Servo M,int pos){
   M1.attach(5);
   M2.attach(6);
   M.write(pos);
+  delay(200);
   M1.detach();
   M2.detach();
 }
@@ -317,6 +321,7 @@ void loop(){
   if (Serial.available()) {
     input = readSerialInput();
   }
+  input = 4;                                                        //hardcode operation mode.
   if(input<0){
     Serial.println("Press 1 for manual calibration.");
     Serial.println("Press 2 for auto calibration.");
@@ -328,6 +333,7 @@ void loop(){
     Serial.println("Press 0 to stop\n");
   }
   if(input==1){
+    while(true)
     ManualCalibrate();
   }
   if(input==2){
@@ -355,6 +361,8 @@ void loop(){
     int pick = -1;
     int drop = -1;
 
+    int EM_act = 0;
+
     Serial.println("Press 1 to pick up at red.");
     Serial.println("Press 2 to pick up at green.");
     Serial.println("Press 3 to pick up at blue.\n");
@@ -366,7 +374,8 @@ void loop(){
     lcd.print("Pick up at Green: 2");
     lcd.setCursor(0,2);
     lcd.print("Pick up at Blue: 3");
-    
+    pick = 2;                                                   //hardcode pick point
+    drop = 1;                                                   //hardcode drop point
     is_valid = false;
     while(true){
       if(Serial.available()){
@@ -417,6 +426,7 @@ void loop(){
     while (true){     //code to pickup
       bool validate = true; // Flag to check if all AVG_LEN readings are true
       ServoCtrl(M1, pos);
+      digitalWrite(EM,EM_act);
 
       // Shift elements in the array to the right
       for (int index = AVG_LEN - 2; index >= 0; index--) {
@@ -438,18 +448,21 @@ void loop(){
           //activate motor and EM  
           lcd.clear();
           lcd.print("Proximity sensor detected");
-          ServoCtrl(M2, 120);
+          ServoCtrl(M2, 100);
 
           EMctrl(1);
-          delay(1000);
+          digitalWrite(EM,HIGH);
+          EM_act = 1;
+          delay(9000);
           lcd.clear();
           lcd.print("Picking up the target");
           
           //retract motor
-          ServoCtrl(M2, 60);
+          ServoCtrl(M2, 20);
           delay(1000); 
           picked = true;
           Serial.println("Picked the target");
+          digitalWrite(EM,HIGH);
           break;
         }
         else{
@@ -471,6 +484,7 @@ void loop(){
     while (true){
       bool validate = true;
       ServoCtrl(M1, pos);
+      digitalWrite(EM,EM_act);
 
       // Shift elements in the array to the right
       for (int index = AVG_LEN - 2; index >= 0; index--) {
@@ -485,10 +499,12 @@ void loop(){
       } 
 
       if(validate && picked){ 
-        ServoCtrl(M2, 120);
+        ServoCtrl(M2, 100);
         EMctrl(0);
+        digitalWrite(EM,LOW);
+        EM_act = 0;
         delay(1000);
-        ServoCtrl(M2, 60);
+        ServoCtrl(M2, 20);
         // picked = false;
         Serial.println("Dropped the target");
         break;
@@ -503,7 +519,7 @@ void loop(){
       }
     }
     ServoCtrl(M1,0);
-
+    
     lcd.clear();
     lcd.print("Program complete");
   }
